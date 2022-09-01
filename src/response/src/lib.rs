@@ -1,17 +1,7 @@
 use std::fs;
 use std::io::Error;
 
-const NOT_FOUND_FILE: &str = "
-<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\">
-    <title>Error</title>
-</head>
-<body>
-    <h1>404 NOT FOUND!</h1>
-</body>
-</html>";
+const NOT_FOUND: &str = "<h1>404 NOT FOUND!</h1>";
 
 // type Headers = HashMap<String, String>;
 
@@ -61,7 +51,7 @@ impl Response {
             Response::new(
                 "HTTP/1.1",
                 String::from("404 NOT FOUND"),
-                Some(NOT_FOUND_FILE.as_bytes().to_vec()),
+                Some(NOT_FOUND.as_bytes().to_vec()),
                 Some(String::from("text/html")),
             )
         });
@@ -114,4 +104,8 @@ impl Response {
             _ => "text/plain".to_string(),
         }
     }
+}
+
+pub struct ResponseLine {
+    pub method:
 }

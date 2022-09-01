@@ -25,7 +25,7 @@ pub fn init_logger() {
             writeln!(
                 f,
                 "[{}]{:>5} > {}",
-                Local::now().format("%Y-%m-%d %H:%M"),
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
                 record.level(),
                 record.args()
             )

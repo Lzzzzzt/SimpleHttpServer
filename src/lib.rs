@@ -14,6 +14,7 @@ type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
 
 pub struct Server {
+    address: String,
     listener: TcpListener,
     pool: ThreadPool,
     pub api: Api,
@@ -24,6 +25,7 @@ impl Server {
         utils::init_logger();
 
         Self {
+            address: addr.to_string(),
             listener: TcpListener::bind(addr).unwrap(),
             pool: ThreadPool::new(thread_num),
             api: Api::new(),
@@ -31,7 +33,8 @@ impl Server {
     }
 
     pub fn run(&self) {
-        info!("Simple HTTP Server start running");
+        info!("Simple HTTP Server start running\n");
+        info!("Start listening on {}", self.address);
 
         for stream in self.listener.incoming() {
             let stream = stream.unwrap();
@@ -74,7 +77,6 @@ impl Server {
         let routes = self.api.routes.read().unwrap();
 
         if routes.contains_key(origin) {
-            ()
         } else {
             error!("origin url {} is not in route table", origin);
         }
@@ -143,6 +145,7 @@ impl Server {
     }
 }
 
+#[derive(Default)]
 pub struct Api {
     routes: Arc<RwLock<HashMap<String, RouteFn>>>,
 }

@@ -6,7 +6,7 @@ fn main() {
 
     server.mount("dist", "/");
 
-    server.redirect("/test2", "/");
+    server.redirect("/test2", "/111");
 
     server.api.get("/test", |req| {
         println!("{}", req);
