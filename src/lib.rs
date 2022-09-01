@@ -9,6 +9,7 @@ use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
 use thread_pool::ThreadPool;
+use methods::Methods;
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
@@ -113,15 +114,15 @@ impl Server {
         let request = Request::parse(&buffer);
 
         let response = match request.request_line.method {
-            request::Methods::Get => match routes.read().unwrap().get(&request.request_line.url) {
-                None => Self::target_not_found(request::Methods::Get, &request.request_line.url)(),
+            Methods::Get => match routes.read().unwrap().get(&request.request_line.url) {
+                None => Self::target_not_found(Methods::Get, &request.request_line.url)(),
                 Some(res) => {
                     info!("GET {} 200 OK", request.request_line.url);
                     res(request)
                 }
             },
             // TODO
-            request::Methods::Post => {
+            Methods::Post => {
                 println!("{:#?}", request);
                 Self::target_not_found(request.request_line.method, &request.request_line.url)()
             }
@@ -131,7 +132,7 @@ impl Server {
     }
 
     fn target_not_found(
-        methods: request::Methods,
+        methods: Methods,
         target: &str,
     ) -> Box<dyn Fn() -> Response + Send + Sync + 'static> {
         error!("{} {} 404 NOT FOUND", methods, target);

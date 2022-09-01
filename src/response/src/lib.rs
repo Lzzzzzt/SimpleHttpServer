@@ -106,6 +106,6 @@ impl Response {
     }
 }
 
-pub struct ResponseLine {
-    pub method:
-}
+// pub struct ResponseLine {
+//     pub method: Method
+// }

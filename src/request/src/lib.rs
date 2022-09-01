@@ -2,6 +2,7 @@ use json::{object, JsonError, JsonValue};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
+use methods::Methods;
 
 type Headers = HashMap<String, String>;
 
@@ -97,7 +98,6 @@ impl Display for Request {
         )
     }
 }
-
 
 
 #[derive(Debug)]
