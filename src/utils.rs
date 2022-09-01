@@ -1,3 +1,6 @@
+use chrono::Local;
+use std::io::Write;
+
 pub fn make_root_path(target: &str) -> String {
     let mut str = target.to_string();
 
@@ -13,4 +16,19 @@ pub fn make_root_path(target: &str) -> String {
     };
 
     str
+}
+
+pub fn init_logger() {
+    env_logger::Builder::from_default_env()
+        .format_timestamp_secs()
+        .format(|f, record| {
+            writeln!(
+                f,
+                "[{}]{:>5} > {}",
+                Local::now().format("%Y-%m-%d %H:%M"),
+                record.level(),
+                record.args()
+            )
+        })
+        .init();
 }

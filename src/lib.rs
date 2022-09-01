@@ -1,15 +1,14 @@
 mod utils;
 
+use log::{error, info};
+use request::Request;
+use response::Response;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
-use chrono::Local;
-use request::Request;
-use response::Response;
 use thread_pool::ThreadPool;
-use log::{error, info};
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
@@ -22,12 +21,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(addr: &str, thread_num: usize) -> Self {
-        env_logger::Builder::from_default_env()
-            .format_timestamp_secs()
-            .format(|f, record| {
-                writeln!(f, "[{}]{:>5} > {}", Local::now().format("%Y-%m-%d %H:%M")
-                         , record.level(), record.args())
-            }).init();
+        utils::init_logger();
 
         Self {
             listener: TcpListener::bind(addr).unwrap(),
@@ -58,7 +52,10 @@ impl Server {
         if result.is_ok() {
             let mut root = utils::make_root_path(mount_point);
 
-            info!("Mount Static Directory From '{}' To '{}'", static_dir_path, &root);
+            info!(
+                "Mount Static Directory From '{}' To '{}'",
+                static_dir_path, &root
+            );
 
             self.api.get(&root, move |_| {
                 Response::file_response(&format!("{}/index.html", path))
