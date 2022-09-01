@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
+use thread_pool::ThreadPool;
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
