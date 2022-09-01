@@ -9,3 +9,6 @@ edition = "2021"
 request = { path = "src/request" }
 response = { path = "src/response" }
 thread_pool = { path = "src/thread_pool" }
+log = "0.4"
+env_logger = "0.9"
+chrono = "0.4"

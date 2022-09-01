@@ -1,10 +1,15 @@
+mod utils;
+
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
+use chrono::Local;
+use request::Request;
 use response::Response;
 use thread_pool::ThreadPool;
+use log::{error, info};
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
@@ -17,6 +22,13 @@ pub struct Server {
 
 impl Server {
     pub fn new(addr: &str, thread_num: usize) -> Self {
+        env_logger::Builder::from_default_env()
+            .format_timestamp_secs()
+            .format(|f, record| {
+                writeln!(f, "[{}]{:>5} > {}", Local::now().format("%Y-%m-%d %H:%M")
+                         , record.level(), record.args())
+            }).init();
+
         Self {
             listener: TcpListener::bind(addr).unwrap(),
             pool: ThreadPool::new(thread_num),
@@ -25,6 +37,8 @@ impl Server {
     }
 
     pub fn run(&self) {
+        info!("Simple HTTP Server start running");
+
         for stream in self.listener.incoming() {
             let stream = stream.unwrap();
 
@@ -39,32 +53,33 @@ impl Server {
     pub fn mount(&mut self, static_dir_path: &str, mount_point: &str) {
         let path = static_dir_path.to_string();
 
-        let mut root = make_root_path(mount_point);
+        let result = fs::read_dir(static_dir_path);
 
-        println!("Mount Point: {}", root);
+        if result.is_ok() {
+            let mut root = utils::make_root_path(mount_point);
 
-        self.api.get(&root, move |_| {
-            Response::file_response(&format!("{}/index.html", path))
-                .unwrap_or_else(|_| Response::response_404(None))
-        });
+            info!("Mount Static Directory From '{}' To '{}'", static_dir_path, &root);
 
-        root.pop();
+            self.api.get(&root, move |_| {
+                Response::file_response(&format!("{}/index.html", path))
+                    .unwrap_or_else(|_| Response::response_404(None))
+            });
 
-        self.walk_dir(static_dir_path, mount_point);
+            root.pop();
 
-        println!();
+            self.walk_dir(static_dir_path, mount_point);
+        } else {
+            error!("{}", result.err().unwrap());
+        }
     }
 
-    pub fn redirect(&self, target: &str, origin: &str) -> Result<(), Error> {
+    pub fn redirect(&self, _target: &str, origin: &str) {
         let routes = self.api.routes.read().unwrap();
 
         if routes.contains_key(origin) {
-            Ok(())
+            ()
         } else {
-            Err(Error::new(
-                ErrorKind::NotFound,
-                format!("origin url {} is not in route table", origin),
-            ))
+            error!("origin url {} is not in route table", origin);
         }
     }
 
@@ -79,7 +94,7 @@ impl Server {
             } else {
                 let file_path = file_or_dir.path().to_str().unwrap().to_string();
 
-                let mut root = make_root_path(root_path);
+                let mut root = utils::make_root_path(root_path);
 
                 root.push_str(&file_path.split('/').collect::<Vec<&str>>()[1..].join("/"));
 
@@ -102,7 +117,7 @@ impl Server {
             request::Methods::Get => match routes.read().unwrap().get(&request.request_line.url) {
                 None => Self::target_not_found(request::Methods::Get, &request.request_line.url)(),
                 Some(res) => {
-                    println!("GET {} 200 OK", &request.request_line.url);
+                    info!("GET {} 200 OK", request.request_line.url);
                     res(request)
                 }
             },
@@ -120,7 +135,7 @@ impl Server {
         methods: request::Methods,
         target: &str,
     ) -> Box<dyn Fn() -> Response + Send + Sync + 'static> {
-        println!("{} {} 404 NOT FOUND", methods, target);
+        error!("{} {} 404 NOT FOUND", methods, target);
         Box::new(|| Response::response_404(None))
     }
 
@@ -129,23 +144,6 @@ impl Server {
         stream.flush()?;
         Ok(())
     }
-}
-
-fn make_root_path(target: &str) -> String {
-    let mut str = target.to_string();
-
-    if target.starts_with('/') && target.ends_with('/') {
-        return str;
-    } else if target.starts_with('/') {
-        str.push('/');
-    } else if target.ends_with('/') {
-        str.insert(0, '/');
-    } else {
-        str.insert(0, '/');
-        str.push('/');
-    };
-
-    str
 }
 
 pub struct Api {
@@ -168,6 +166,6 @@ impl Api {
             .unwrap()
             .insert(route.to_string(), Box::new(f));
 
-        println!("Add {} to Route Table", route);
+        info!("Add '{}' to Route Table", route);
     }
 }
