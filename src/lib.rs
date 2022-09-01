@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
+use response::Response;
 use thread_pool::ThreadPool;
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
