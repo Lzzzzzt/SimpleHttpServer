@@ -1,5 +1,8 @@
+mod response_line;
+
 use std::fs;
 use std::io::Error;
+use methods::Methods;
 
 const NOT_FOUND: &str = "<h1>404 NOT FOUND!</h1>";
 
@@ -106,6 +109,6 @@ impl Response {
     }
 }
 
-// pub struct ResponseLine {
-//     pub method: Method
-// }
+pub struct ResponseLine {
+    pub method: Methods
+}
