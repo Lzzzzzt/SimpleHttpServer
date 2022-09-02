@@ -1,3 +1,4 @@
+use log::debug;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -20,8 +21,8 @@ impl ThreadPool {
     }
 
     pub fn execute<F>(&self, f: F)
-        where
-            F: FnOnce() + Send + 'static,
+    where
+        F: FnOnce() + Send + 'static,
     {
         let msg = Message::Job(Box::new(f));
         self.sender.send(msg).unwrap();
@@ -35,7 +36,7 @@ impl Drop for ThreadPool {
             .for_each(|_| self.sender.send(Message::Terminate).unwrap());
 
         self.workers.iter_mut().for_each(|worker| {
-            println!("Shutting down worker {}", worker.id);
+            debug!("Shutting down worker {}", worker.id);
 
             worker.thread.take().unwrap().join().unwrap();
         });
@@ -59,7 +60,7 @@ impl Worker {
                         job();
                     }
                     Message::Terminate => {
-                        println!("Worker {} stop working", id);
+                        debug!("Worker {} stop working", id);
                         break;
                     }
                 };
@@ -73,4 +74,32 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 enum Message {
     Job(Job),
     Terminate,
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ThreadPool;
+    use std::mem;
+    use std::sync::{Arc, RwLock};
+
+    #[test]
+    fn thread_pool_work() {
+        let pool = ThreadPool::new(4);
+        let global_data = Arc::new(RwLock::new(0));
+
+        let mut data_vec = vec![];
+
+        (0..10).for_each(|_| data_vec.push(Arc::clone(&global_data)));
+
+        for data in data_vec {
+            pool.execute(move || {
+                let mut val = data.write().unwrap();
+                *val = *val + 1;
+            });
+        }
+
+        mem::drop(pool);
+
+        assert_eq!(*global_data.read().unwrap(), 10);
+    }
 }

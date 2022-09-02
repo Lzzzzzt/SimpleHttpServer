@@ -1,7 +1,7 @@
-use std::fmt::{Display, Formatter};
-use json::{JsonValue, object};
-use methods::Methods;
 use crate::utils::parse_kv;
+use json::{object, JsonValue};
+use methods::Methods;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct RequestLine {
@@ -55,6 +55,36 @@ impl Display for RequestLine {
             f,
             "Request Line: \n\t{} {} {}\n\tQuery: {}",
             self.method, self.url, self.http_version, self.query
+        )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::RequestLine;
+    use json::object;
+    use methods::Methods;
+
+    #[test]
+    fn parse_get_request_without_query() {
+        let req: RequestLine = "GET / HTTP/1.1".into();
+
+        assert_eq!(req.url, "/".to_string());
+        assert_eq!(req.method.to_string(), Methods::Get.to_string());
+        assert_eq!(req.http_version, "HTTP/1.1".to_string());
+        assert_eq!(req.query.to_string(), object! {}.to_string());
+    }
+
+    #[test]
+    fn parse_get_request_with_query() {
+        let req: RequestLine = "GET /hello?name=rust&age=7 HTTP/1.1".into();
+
+        assert_eq!(req.url, "/hello".to_string());
+        assert_eq!(req.method.to_string(), Methods::Get.to_string());
+        assert_eq!(req.http_version, "HTTP/1.1".to_string());
+        assert_eq!(
+            req.query.to_string(),
+            object! {name: "rust", age: "7"}.to_string()
         )
     }
 }

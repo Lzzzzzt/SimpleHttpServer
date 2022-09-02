@@ -51,7 +51,7 @@ impl Request {
                 })
             }
             _ if !body_str.is_empty() => {
-                println!("Error: wrong `Content-Type`");
+                log::error!("Error: wrong `Content-Type`");
                 Body {
                     content: object! {},
                 }
@@ -76,10 +76,6 @@ impl Display for Request {
         let header = self.headers.to_string();
         let body = self.body.to_string();
 
-        write!(
-            f,
-            "{}",
-            [request_line, String::from("Headers:"), header, body].join("\n")
-        )
+        write!(f, "{}", [request_line, header, body].join("\r\n"))
     }
 }

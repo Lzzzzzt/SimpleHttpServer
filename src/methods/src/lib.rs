@@ -28,3 +28,26 @@ impl From<&str> for Methods {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::Methods;
+    use crate::Methods::{Get, Post};
+
+    #[test]
+    fn method_to_str() {
+        assert_eq!(Get.to_string().as_str(), "GET");
+        assert_eq!(Post.to_string().as_str(), "POST");
+    }
+
+    #[test]
+    fn str_to_method() {
+        let get: Methods = "GET".into();
+        let post: Methods = "POST".into();
+        let other: Methods = "AAA".into();
+
+        assert_eq!(get.to_string(), Get.to_string());
+        assert_eq!(post.to_string(), Post.to_string());
+        assert_eq!(other.to_string(), Get.to_string());
+    }
+}

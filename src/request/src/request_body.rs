@@ -1,7 +1,7 @@
+use crate::utils::parse_kv;
+use json::{JsonError, JsonValue};
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
-use json::{JsonError, JsonValue};
-use crate::utils::parse_kv;
 
 #[derive(Debug)]
 pub struct Body {
@@ -38,6 +38,40 @@ impl DerefMut for Body {
 
 impl Display for Body {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Body: \n\t{}", self.content)
+        write!(f, "\r\n{}", self.content)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Body;
+    use json::object;
+
+    #[test]
+    fn parse_body_json() {
+        let body = Body::parse_json("{\"test\": \"1\", \"hello\": \"hi\"}").unwrap();
+
+        assert_eq!(
+            body.content.to_string(),
+            object! {
+                test: "1",
+                hello: "hi",
+            }
+            .to_string()
+        )
+    }
+
+    #[test]
+    fn parse_body_normal() {
+        let body = Body::parse("test=1&hello=hi").unwrap();
+
+        assert_eq!(
+            body.content.to_string(),
+            object! {
+                test: "1",
+                hello: "hi",
+            }
+            .to_string()
+        )
     }
 }

@@ -42,12 +42,32 @@ impl Display for Header {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Body:\n{}",
+            "{}",
             self.content
                 .entries()
-                .map(|(k, v)| { format!("\t{}: {}", k, v) })
+                .map(|(k, v)| { format!("{}: {}", k, v) })
                 .collect::<Vec<String>>()
-                .join("\n")
+                .join("\r\n")
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Header;
+    use json::object;
+
+    #[test]
+    fn parse_header() {
+        let header: Header = "Content-Length: 10\r\naccept: */*".split("\r\n").into();
+
+        assert_eq!(
+            header.content.to_string(),
+            object! {
+                "Content-Length": "10",
+                "accept": "*/*"
+            }
+            .to_string()
+        );
     }
 }

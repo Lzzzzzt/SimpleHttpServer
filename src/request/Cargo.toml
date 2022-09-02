@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 json = "*"
+log = "0.4"
+env_logger = "0.9"
 methods = { path = "../methods" }
