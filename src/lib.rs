@@ -1,15 +1,15 @@
 mod utils;
 
 use log::{error, info};
+use methods::Methods;
 use request::Request;
-use response::Response;
+use response::{BaseResponse, Response};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
 use thread_pool::ThreadPool;
-use methods::Methods;
 
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
@@ -62,8 +62,9 @@ impl Server {
             );
 
             self.api.get(&root, move |_| {
-                Response::file_response(&format!("{}/index.html", path))
-                    .unwrap_or_else(|_| Response::response_404(None))
+                BaseResponse::success()
+                    .file(&format!("{}/index.html", path))
+                    .unwrap_or_else(|_| BaseResponse::client_error().not_found())
             });
 
             root.pop();
@@ -99,8 +100,9 @@ impl Server {
                 root.push_str(&file_path.split('/').collect::<Vec<&str>>()[1..].join("/"));
 
                 self.api.get(&root, move |_| {
-                    Response::file_response(&file_path)
-                        .unwrap_or_else(|_| Response::response_404(None))
+                    BaseResponse::success()
+                        .file(&file_path)
+                        .unwrap_or_else(|_| BaseResponse::client_error().not_found())
                 });
             }
         });
@@ -136,7 +138,7 @@ impl Server {
         target: &str,
     ) -> Box<dyn Fn() -> Response + Send + Sync + 'static> {
         error!("{} {} 404 NOT FOUND", methods, target);
-        Box::new(|| Response::response_404(None))
+        Box::new(|| BaseResponse::client_error().not_found())
     }
 
     fn send_response(mut stream: TcpStream, mut response: Response) -> Result<(), Error> {
@@ -159,8 +161,8 @@ impl Api {
     }
 
     pub fn get<F>(&mut self, route: &str, f: F)
-        where
-            F: Fn(Request) -> Response + Send + Sync + 'static,
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
     {
         self.routes
             .write()

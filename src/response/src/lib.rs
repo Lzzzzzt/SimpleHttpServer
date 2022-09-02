@@ -1,114 +1,129 @@
-mod response_line;
+mod response_header;
+mod status;
+mod status_line;
+mod utils;
 
+use crate::response_header::Header;
+use crate::status::Status;
+use crate::status_line::StatusLine;
+use json::object;
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::Error;
-use methods::Methods;
 
 const NOT_FOUND: &str = "<h1>404 NOT FOUND!</h1>";
 
 // type Headers = HashMap<String, String>;
 
 #[derive(Debug)]
+pub struct BaseResponse;
+
+impl BaseResponse {
+    pub fn success() -> SuccessResponse {
+        SuccessResponse
+    }
+
+    // Todo redirect
+
+    pub fn client_error() -> ClientErrorResponse {
+        ClientErrorResponse
+    }
+}
+
 pub struct Response {
-    pub http_version: String,
-    pub status: String,
-    pub content_type: Option<String>,
-    pub content: Option<Vec<u8>>,
+    status_line: StatusLine,
+    header: Header,
+    content: Option<Vec<u8>>,
 }
 
 impl Response {
     pub fn new(
         http_version: &str,
-        status: String,
+        status: Status,
+        header: Header,
         content: Option<Vec<u8>>,
-        content_type: Option<String>,
     ) -> Self {
-        Self {
-            http_version: http_version.to_string(),
+        let status_line = StatusLine {
             status,
+            http_version: http_version.into(),
+        };
+
+        Self {
+            status_line,
+            header,
             content,
-            content_type,
         }
-    }
-
-    // pub fn redirect_response(target: &str) -> Self {
-    //     Response::new("HTTP/1.1", "302")
-    // }
-
-    pub fn file_response(file: &str) -> Result<Self, Error> {
-        let content = fs::read(file)?;
-        let content_type = Self::parse_file_mime_type(file);
-
-        Ok(Self::new(
-            "HTTP/1.1",
-            String::from("200 OK"),
-            Some(content),
-            Some(content_type),
-        ))
-    }
-
-    pub fn response_404(file: Option<&str>) -> Self {
-        let file = file.unwrap_or("");
-
-        let mut response = Self::file_response(file).unwrap_or_else(|_| {
-            Response::new(
-                "HTTP/1.1",
-                String::from("404 NOT FOUND"),
-                Some(NOT_FOUND.as_bytes().to_vec()),
-                Some(String::from("text/html")),
-            )
-        });
-        response.status = "404 NOT FOUND".to_string();
-        response
     }
 
     pub fn as_bytes(&mut self) -> Vec<u8> {
-        let response = match &self.content {
-            None => {
-                format!(
-                    "{} {}\r\nContent-Length: 0\r\n\r\n",
-                    self.http_version, self.status,
-                )
-            }
-            Some(content) => {
-                let mime_type = self.content_type.clone().unwrap();
-                format!(
-                    "{} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
-                    self.http_version,
-                    self.status,
-                    mime_type,
-                    content.len(),
-                )
-            }
-        };
-
+        let response = self.to_string();
         let mut res = response.into_bytes();
-
         let content = self.content.take();
-
         res.append(&mut content.unwrap());
-
         res
     }
 
-    fn parse_file_mime_type(file: &str) -> String {
-        let file_name = file.to_string();
-        let ext_name = file_name.split('.').last().unwrap_or("txt");
-
-        match ext_name {
-            "html" => "text/html".to_string(),
-            "css" => "text/css".to_string(),
-            "js" => "text/javascript".to_string(),
-            "map" => "application/json".to_string(),
-            "jpg" | "jpeg" => "image/jpeg".to_string(),
-            "png" => "image/png".to_string(),
-            "ico" => "image/x-icon".to_string(),
-            "svg" => "image/svg+xml".to_string(),
-            _ => "text/plain".to_string(),
-        }
+    pub fn set_content_type(mut self, content_type: &str) -> Self {
+        self.header["Content-Type"] = json::JsonValue::String(content_type.into());
+        self
     }
 }
 
-pub struct ResponseLine {
-    pub method: Methods
+impl Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\r\n{}\r\n\r\n", self.status_line, self.header)
+    }
+}
+
+pub struct SuccessResponse;
+
+impl SuccessResponse {
+    pub fn file(self, file: &str) -> Result<Response, Error> {
+        let content = fs::read(file)?;
+
+        let header = object! {
+            "Content-Type": utils::parse_file_mime_type(file),
+            "Content-Length": content.len()
+        };
+
+        Ok(Response::new(
+            "HTTP/1.1",
+            Status::ok(),
+            header.into(),
+            Some(content),
+        ))
+    }
+
+    pub fn string(self, string: &str) -> Response {
+        let content = string.as_bytes().to_vec();
+
+        let header = object! {
+            "Content-Type": "text/plain",
+            "Content-Length": content.len()
+        };
+
+        Response::new("HTTP/1.1", Status::ok(), header.into(), Some(content))
+    }
+}
+
+// Todo RedirectResponse
+
+pub struct ClientErrorResponse;
+
+impl ClientErrorResponse {
+    pub fn not_found(self) -> Response {
+        let content = NOT_FOUND.as_bytes().to_vec();
+
+        let header = object! {
+            "Content-Type": "text/html",
+            "Content-Length": content.len()
+        };
+
+        Response::new(
+            "HTTP/1.1",
+            Status::not_found(),
+            header.into(),
+            Some(content),
+        )
+    }
 }
