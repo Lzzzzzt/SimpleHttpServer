@@ -14,6 +14,20 @@ impl Status {
         }
     }
 
+    pub fn moved_permanently() -> Self {
+        Self {
+            code: 301,
+            message: String::from("Moved Permanently"),
+        }
+    }
+
+    pub fn found() -> Self {
+        Self {
+            code: 302,
+            message: String::from("Found"),
+        }
+    }
+
     pub fn bad_request() -> Self {
         Self {
             code: 400,

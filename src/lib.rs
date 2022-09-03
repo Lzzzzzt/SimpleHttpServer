@@ -1,18 +1,19 @@
-mod utils;
-
-use log::{error, info};
-use methods::Methods;
-use request::Request;
-use response::{BaseResponse, Response};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
+
+use log::{debug, error, info};
+use request::Request;
+use response::{BaseResponse, Response};
 use thread_pool::ThreadPool;
 
+use methods::Methods;
+
+mod utils;
+
 type RouteFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
-type Routes = Arc<RwLock<HashMap<String, RouteFn>>>;
 
 pub struct Server {
     address: String,
@@ -34,7 +35,7 @@ impl Server {
     }
 
     pub fn run(&self) {
-        info!("Simple HTTP Server start running\n");
+        info!("Simple HTTP Server start running");
         info!("Start listening on {}", self.address);
 
         for stream in self.listener.incoming() {
@@ -75,13 +76,12 @@ impl Server {
         }
     }
 
-    pub fn redirect(&self, _target: &str, origin: &str) {
-        let routes = self.api.routes.read().unwrap();
+    pub fn redirect(&mut self, method: Methods, origin: &str, target: &str) {
+        let origin = origin.to_string();
 
-        if routes.contains_key(origin) {
-        } else {
-            error!("origin url {} is not in route table", origin);
-        }
+        self.api.response(method, target, move |_| {
+            BaseResponse::redirect().temporary(&origin)
+        });
     }
 
     fn walk_dir(&mut self, dir_path: &str, root_path: &str) {
@@ -108,25 +108,24 @@ impl Server {
         });
     }
 
-    fn handle_connection(mut stream: TcpStream, routes: Routes) {
+    fn handle_connection(mut stream: TcpStream, routes: RouteTable) {
         let mut buffer = [0; 1024];
 
-        let _ = stream.read(&mut buffer).unwrap();
+        let length = stream.read(&mut buffer).unwrap();
 
-        let request = Request::parse(&buffer);
+        let request = Request::parse(&buffer[0..length]);
 
-        let response = match request.request_line.method {
-            Methods::Get => match routes.read().unwrap().get(&request.request_line.url) {
-                None => Self::target_not_found(Methods::Get, &request.request_line.url)(),
-                Some(res) => {
-                    info!("GET {} 200 OK", request.request_line.url);
-                    res(request)
-                }
-            },
-            // TODO
-            Methods::Post => {
-                println!("{:#?}", request);
-                Self::target_not_found(request.request_line.method, &request.request_line.url)()
+        let request_method = &request.request_line.method;
+        let request_url = &request.request_line.url;
+
+        let response = match routes.get(request_method).read().unwrap().get(request_url) {
+            None => Self::target_not_found(request_method, request_url)(),
+            Some(res) => {
+                let method = request.request_line.method.to_string();
+                let url = request.request_line.url.clone();
+                let response = res(request) as Response;
+                info!("{} {} {}", method, url, response.message());
+                response
             }
         } as Response;
 
@@ -134,7 +133,7 @@ impl Server {
     }
 
     fn target_not_found(
-        methods: Methods,
+        methods: &Methods,
         target: &str,
     ) -> Box<dyn Fn() -> Response + Send + Sync + 'static> {
         error!("{} {} 404 NOT FOUND", methods, target);
@@ -142,21 +141,53 @@ impl Server {
     }
 
     fn send_response(mut stream: TcpStream, mut response: Response) -> Result<(), Error> {
-        let _ = stream.write(&response.as_bytes())?;
+        stream.write_all(&response.as_bytes())?;
         stream.flush()?;
+
         Ok(())
     }
 }
 
 #[derive(Default)]
+pub struct RouteTable {
+    get: Arc<RwLock<HashMap<String, RouteFn>>>,
+    post: Arc<RwLock<HashMap<String, RouteFn>>>,
+}
+
+impl RouteTable {
+    pub fn new() -> Self {
+        Self {
+            get: Arc::new(RwLock::new(HashMap::new())),
+            post: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub fn get(&self, method: &Methods) -> Arc<RwLock<HashMap<String, RouteFn>>> {
+        match method {
+            Methods::Get => Arc::clone(&self.get),
+            Methods::Post => Arc::clone(&self.post),
+        }
+    }
+}
+
+impl Clone for RouteTable {
+    fn clone(&self) -> Self {
+        Self {
+            get: Arc::clone(&self.get),
+            post: Arc::clone(&self.post),
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct Api {
-    routes: Arc<RwLock<HashMap<String, RouteFn>>>,
+    routes: RouteTable,
 }
 
 impl Api {
     pub fn new() -> Self {
         Self {
-            routes: Arc::new(RwLock::new(HashMap::new())),
+            routes: RouteTable::new(),
         }
     }
 
@@ -164,11 +195,26 @@ impl Api {
     where
         F: Fn(Request) -> Response + Send + Sync + 'static,
     {
+        self.response(Methods::Get, route, f);
+    }
+
+    pub fn post<F>(&mut self, route: &str, f: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
+        self.response(Methods::Post, route, f);
+    }
+
+    pub fn response<F>(&mut self, method: Methods, route: &str, f: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
         self.routes
+            .get(&method)
             .write()
             .unwrap()
             .insert(route.to_string(), Box::new(f));
 
-        info!("Add '{}' to Route Table", route);
+        debug!("{}: Add {} to Route Table", method, route);
     }
 }

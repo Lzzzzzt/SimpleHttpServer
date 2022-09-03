@@ -30,15 +30,13 @@ impl Request {
 
         let headers: Header = request_headers.into();
 
-        let content_len = headers["Content-Length"].as_usize().unwrap_or(0);
-
         let default_content_type = String::from("application/x-www-form-urlencoded");
 
         let content_type = headers["Content-Type"]
             .as_str()
             .unwrap_or(&default_content_type);
 
-        let body_str = request_str.next().unwrap().split_at(content_len).0;
+        let body_str = request_str.next().unwrap();
 
         let body = match content_type {
             "application/x-www-form-urlencoded" if !body_str.is_empty() => Body::parse(body_str)

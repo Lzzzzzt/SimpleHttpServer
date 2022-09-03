@@ -24,6 +24,9 @@ impl BaseResponse {
     }
 
     // Todo redirect
+    pub fn redirect() -> RedirectResponse {
+        RedirectResponse
+    }
 
     pub fn client_error() -> ClientErrorResponse {
         ClientErrorResponse
@@ -59,13 +62,17 @@ impl Response {
         let response = self.to_string();
         let mut res = response.into_bytes();
         let content = self.content.take();
-        res.append(&mut content.unwrap());
+        res.append(&mut content.unwrap_or(vec![]));
         res
     }
 
     pub fn set_content_type(mut self, content_type: &str) -> Self {
         self.header["Content-Type"] = json::JsonValue::String(content_type.into());
         self
+    }
+
+    pub fn message(&self) -> String {
+        format!("{}", self.status_line.status)
     }
 }
 
@@ -106,7 +113,25 @@ impl SuccessResponse {
     }
 }
 
-// Todo RedirectResponse
+pub struct RedirectResponse;
+
+impl RedirectResponse {
+    pub fn forever(self, target: &str) -> Response {
+        let header = object! {
+            "Location": target
+        };
+
+        Response::new("HTTP/1.1", Status::moved_permanently(), header.into(), None)
+    }
+
+    pub fn temporary(self, target: &str) -> Response {
+        let header = object! {
+            "Location": target
+        };
+
+        Response::new("HTTP/1.1", Status::found(), header.into(), None)
+    }
+}
 
 pub struct ClientErrorResponse;
 

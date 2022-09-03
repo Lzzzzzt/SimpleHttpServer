@@ -1,22 +1,22 @@
 use response::BaseResponse;
+
+use methods::Methods;
 use simple_http_server::Server;
 
 fn main() {
-    let mut server = Server::new("0.0.0.0:7878", 16);
+    let mut server = Server::new("0.0.0.0:7878", 32);
 
     server.mount("dist", "/");
 
-    server.redirect("/test2", "/111");
+    server.api.post("/echo", |request| {
+        let body = request.body.to_string();
 
-    server.api.get("/test", |_| {
-        BaseResponse::success().file("dist/index.html").unwrap()
-    });
-
-    server.api.get("/hello", |_| {
         BaseResponse::success()
-            .string("Hello, world")
-            .set_content_type("text/html")
+            .string(body.as_str())
+            .set_content_type("application/json")
     });
+
+    server.redirect(Methods::Get, "/", "/red");
 
     server.run();
 }

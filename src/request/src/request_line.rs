@@ -53,7 +53,7 @@ impl Display for RequestLine {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Request Line: \n\t{} {} {}\n\tQuery: {}",
+            "{} {} {} Query: {}",
             self.method, self.url, self.http_version, self.query
         )
     }
